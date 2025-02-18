@@ -16,6 +16,11 @@ contract Raffle {
     uint256 private immutable i_entryFee;
     address payable[] private s_participants;
 
+    /**
+     * Events
+     */
+    event RaffleEntered(address indexed player);
+
     constructor(uint256 _entryFee) {
         i_entryFee = _entryFee;
     }
