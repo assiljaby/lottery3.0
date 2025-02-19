@@ -22,4 +22,26 @@ contract RaffleTest is Test {
         vm.prank(i_user);
         raffle.enterRaffle{value: 0.01 ether}();
     }
+
+    function testRaffleShouldBeOpeninitially() public view {
+        assertEq(uint256(raffle.getRaffleState()), 0);
+    }
+
+    function testRevertWhenNotEnoughTimePassed() public {
+        vm.expectRevert();
+        raffle.selectWinner();
+    }
+
+    function testEnterShouldRevertIfStateIsCalculating() public {
+        raffle.setRaffleState(1);
+        vm.expectRevert();
+        raffle.enterRaffle();
+    }
+
+    function testParticipenthShouldExistAfterEnteringTheRaffle() public {
+        vm.prank(i_user);
+        raffle.enterRaffle{value: 0.2 ether}();
+
+        assertEq(raffle.getParticipent(0), i_user);
+    }
 }
