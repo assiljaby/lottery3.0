@@ -10,7 +10,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/v0.8/vrf/dev/libraries/VRFV2
  * @notice this contract creates a lottery
  * @dev Implements Chainlink VRFv2.5
  */
-contract Raffle is VRFConsumerBaseV2Plus{
+contract Raffle is VRFConsumerBaseV2Plus {
     /**
      * Errors
      */
