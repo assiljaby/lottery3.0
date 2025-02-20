@@ -14,6 +14,9 @@ contract RaffleTest is Test {
     address immutable i_participant = makeAddr("participant");
     uint256 constant STARTING_BALANCE = 10 ether;
 
+    event RaffleEntered(address indexed participant);
+    event WinnerPicked(address indexed winner);
+
     function setUp() external {
         DeployRaffle deployRaffle = new DeployRaffle();
         (raffle, helperConfig) = deployRaffle.deployContract();
@@ -21,9 +24,16 @@ contract RaffleTest is Test {
         vm.deal(i_participant, STARTING_BALANCE);
     }
 
-    function testRevertWhenNotEnoughEntryFee() public {
-        vm.expectRevert();
+    modifier enterRaffle {
         vm.prank(i_participant);
+        raffle.enterRaffle{value: config.entryFee}();
+
+        _;
+    }
+
+    function testRevertWhenNotEnoughEntryFee() public {
+        vm.prank(i_participant);
+        vm.expectRevert(Raffle.Raffle__SendMoreToEnterRaffle.selector);
         raffle.enterRaffle{value: 0.001 ether}();
     }
 
@@ -37,15 +47,23 @@ contract RaffleTest is Test {
     }
 
     function testEnterShouldRevertIfStateIsCalculating() public {
+        vm.prank(i_participant);
         raffle.setRaffleState(1);
-        vm.expectRevert();
+        
+        vm.expectRevert(Raffle.Raffle__NotOpen.selector);
         raffle.enterRaffle();
     }
 
-    function testParticipenthShouldExistAfterEnteringTheRaffle() public {
-        vm.prank(i_participant);
-        raffle.enterRaffle{value: 0.2 ether}();
-
+    function testParticipenthShouldExistAfterEnteringTheRaffle() enterRaffle public {
         assertEq(raffle.getParticipent(0), i_participant);
+    }
+
+    function testEventIsEmittedWhenParticipantEnters() public {
+        vm.prank(i_participant);
+
+        vm.expectEmit(true, false, false, false, address(raffle));
+        emit RaffleEntered(i_participant);
+
+        raffle.enterRaffle{value: config.entryFee}();
     }
 }
