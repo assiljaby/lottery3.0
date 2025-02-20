@@ -13,7 +13,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/v0.8/vrf/dev/libraries/VRFV2
 contract Raffle is VRFConsumerBaseV2Plus {
     /* Errors */
     error Raffle__SendMoreToEnterRaffle();
-    error Raffle__NotEnoughTimePassed();
+    error Raffle__UpKeepNotNeeded(uint256 balance, uint256 num_participants, uint256 state);
     error Raffle__TransferFailed();
     error Raffle__NotOpen();
 
@@ -43,9 +43,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
     constructor(
         uint256 _entryFee,
         uint256 _interval,
-        bytes32 _gasLane,
         uint256 _subId,
         uint32 _callbackGasLimit,
+        bytes32 _gasLane,
         address vrfCoordinator
     ) VRFConsumerBaseV2Plus(vrfCoordinator) {
         i_entryFee = _entryFee;
@@ -58,16 +58,17 @@ contract Raffle is VRFConsumerBaseV2Plus {
         s_raffleState = RaffleState.OPEN;
     }
 
+    /**
+     * @dev Function used to participate in the lottery.
+     * The following conditions must be met to enter:
+     * 1. The Raffle state should be Open
+     * 2. Participant should spend the entry fee
+     * -> an event will be emitted, otherwise reverts
+     */
     function enterRaffle() external payable {
-        /**
-         * @dev Reverts any attempt to enter while we
-         * calculate the winner of the current round
-         */
         if (s_raffleState != RaffleState.OPEN) {
             revert Raffle__NotOpen();
         }
-        // checks if value sent is enough
-        // reverts otherwise
         if (msg.value < i_entryFee) {
             // using custom errors is more
             // gas efficient than require
@@ -75,21 +76,52 @@ contract Raffle is VRFConsumerBaseV2Plus {
         }
 
         s_participants.push(payable(msg.sender));
-
         emit RaffleEntered(msg.sender);
     }
 
-    // 1. Wait for inteval
-    // 1. Generate a number
-    // 2. Use the number to pick a participant
-    function selectWinner() external {
-        if ((block.timestamp - s_lastTimeStamp) < i_interval) {
-            revert Raffle__NotEnoughTimePassed();
+    /**
+     * @dev Funtion called by Chainlink automation nodes. We are using it
+     * to check if it is time to call the select winner function (performUpkeep).
+     * The following should be true in order to select a winner:
+     * 1. Interval that should have passed between the raffle rounds
+     * 2. The raffle state should be Open
+     * 3. The contract should hold money
+     * 4. Chainlink sub should have LINK
+     * @param - ignored
+     * @return upkeepNeeded - if true -> time to select a winner
+     * @return - ignored
+     */
+    function checkUpkeep(bytes memory /* checkData */ )
+        public
+        view
+        returns (bool upkeepNeeded, bytes memory /* performData */ )
+    {
+        bool hasTimePassed = (block.timestamp - s_lastTimeStamp) >= i_interval;
+        bool isRaffleOpen = s_raffleState == RaffleState.OPEN;
+        bool hasBalance = address(this).balance > 0;
+        bool hasPlayers = s_participants.length > 0;
+        upkeepNeeded = hasTimePassed && isRaffleOpen && hasBalance && hasPlayers;
+
+        return (upkeepNeeded, "");
+    }
+
+    /**
+     * @dev This function is called by checkUpkeep when the above
+     * conditions are met.
+     * This function generates a random number using Chainlink VRFv2.5
+     * then uses that number to select a participant from the array.
+     * @param - ignored
+     */
+    function performUpkeep(bytes calldata /* performData */ ) external {
+        (bool upkeepNeeded,) = checkUpkeep("");
+        if (!upkeepNeeded) {
+            revert Raffle__UpKeepNotNeeded(address(this).balance, s_participants.length, uint256(s_raffleState));
         }
 
         s_raffleState = RaffleState.CALCULATING;
 
-        uint256 requestId = s_vrfCoordinator.requestRandomWords(
+        /* uint256 requestId = */
+        s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: i_gasLane,
                 subId: i_subId,
@@ -104,12 +136,12 @@ contract Raffle is VRFConsumerBaseV2Plus {
         );
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
+    function fulfillRandomWords(uint256, /* requestId */ uint256[] calldata randomWords) internal override {
         /**
          * @dev The result of a number modulo n
          * will always be between 0 and n-1,
          * This insures we are picking an index
-         * that is within the array's length
+         * that is within the array's length.
          */
         uint256 winnerIdx = randomWords[0] % s_participants.length;
         s_lastWinner = s_participants[winnerIdx];

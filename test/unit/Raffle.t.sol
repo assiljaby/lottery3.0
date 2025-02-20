@@ -2,25 +2,29 @@
 pragma solidity 0.8.19;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Raffle} from "../src/Raffle.sol";
-import {DeployRaffle} from "../script/Raffle.s.sol";
+import {Raffle} from "src/Raffle.sol";
+import {DeployRaffle} from "script/Raffle.s.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
 
 contract RaffleTest is Test {
     Raffle private raffle;
+    HelperConfig private helperConfig;
+    HelperConfig.NetworkConfig private config;
 
-    address immutable i_user = makeAddr("user");
+    address immutable i_participant = makeAddr("participant");
     uint256 constant STARTING_BALANCE = 10 ether;
 
     function setUp() external {
         DeployRaffle deployRaffle = new DeployRaffle();
-        raffle = deployRaffle.run();
-        vm.deal(i_user, STARTING_BALANCE);
+        (raffle, helperConfig) = deployRaffle.deployContract();
+        config = helperConfig.getConfig();
+        vm.deal(i_participant, STARTING_BALANCE);
     }
 
     function testRevertWhenNotEnoughEntryFee() public {
         vm.expectRevert();
-        vm.prank(i_user);
-        raffle.enterRaffle{value: 0.01 ether}();
+        vm.prank(i_participant);
+        raffle.enterRaffle{value: 0.001 ether}();
     }
 
     function testRaffleShouldBeOpeninitially() public view {
@@ -29,7 +33,7 @@ contract RaffleTest is Test {
 
     function testRevertWhenNotEnoughTimePassed() public {
         vm.expectRevert();
-        raffle.selectWinner();
+        raffle.performUpkeep("");
     }
 
     function testEnterShouldRevertIfStateIsCalculating() public {
@@ -39,9 +43,9 @@ contract RaffleTest is Test {
     }
 
     function testParticipenthShouldExistAfterEnteringTheRaffle() public {
-        vm.prank(i_user);
+        vm.prank(i_participant);
         raffle.enterRaffle{value: 0.2 ether}();
 
-        assertEq(raffle.getParticipent(0), i_user);
+        assertEq(raffle.getParticipent(0), i_participant);
     }
 }
