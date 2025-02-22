@@ -87,4 +87,14 @@ contract HelperConfig is Script, ScriptConstants {
         });
         return localNetworkConfig;
     }
+
+    function setSubId(uint256 _subId) public {
+        if (configMappings[block.chainid].vrfCoordinator != address(0)) {
+            configMappings[block.chainid].subId = _subId;
+        } else if (block.chainid == LOCAL_CHAIN_ID) {
+            localNetworkConfig.subId = _subId;
+        } else {
+            revert HelperConfig__InvalidChainId();
+        }
+    }
 }
