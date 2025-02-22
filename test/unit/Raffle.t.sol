@@ -24,6 +24,9 @@ contract RaffleTest is Test {
         vm.deal(i_participant, STARTING_BALANCE);
     }
 
+    /*////////////////////////////////////////////////////////
+                        Modifiers  
+    ///////////////////////////////////////////////////////*/
     modifier enterRaffle() {
         vm.prank(i_participant);
         raffle.enterRaffle{value: config.entryFee}();
@@ -39,29 +42,45 @@ contract RaffleTest is Test {
         _;
     }
 
+    modifier pastForward() {
+        vm.warp(block.timestamp + config.interval);
+        vm.roll(block.number + 1);
+
+        _;
+    }
+
+    /*////////////////////////////////////////////////////////
+                        constructor  
+    ///////////////////////////////////////////////////////*/
+
+    function testAllStateVariableInitializedWhenCallingConstructor() public view {
+        assertEq(raffle.getEntryFee(), config.entryFee);
+        assertEq(raffle.getGasLane(), config.gasLane);
+        assertEq(raffle.getGasLimit(), config.callbackGasLimit);
+        assertEq(raffle.getInterval(), config.interval);
+        assertGe(block.timestamp, raffle.getLastTimestamp());
+        assertEq(uint256(raffle.getRaffleState()), 0);
+        assertEq(raffle.getSubId(), config.subId);
+    }
+
+    /*////////////////////////////////////////////////////////
+                        enterRaffle  
+    ///////////////////////////////////////////////////////*/
+
     function testRevertWhenNotEnoughEntryFee() public {
         vm.prank(i_participant);
         vm.expectRevert(Raffle.Raffle__SendMoreToEnterRaffle.selector);
         raffle.enterRaffle{value: 0.001 ether}();
     }
 
-    function testRaffleShouldBeOpeninitially() public view {
-        assertEq(uint256(raffle.getRaffleState()), 0);
-    }
-
-    function testRevertWhenNotEnoughTimePassed() public {
-        vm.expectRevert();
-        raffle.performUpkeep("");
+    function testParticipenthShouldExistAfterEnteringTheRaffle() public enterRaffle {
+        assertEq(raffle.getParticipent(0), i_participant);
     }
 
     function testEnterShouldRevertIfStateIsCalculating() public enterRaffle calculating {
         vm.prank(i_participant);
         vm.expectRevert(Raffle.Raffle__NotOpen.selector);
         raffle.enterRaffle();
-    }
-
-    function testParticipenthShouldExistAfterEnteringTheRaffle() public enterRaffle {
-        assertEq(raffle.getParticipent(0), i_participant);
     }
 
     function testEventIsEmittedWhenParticipantEnters() public {
@@ -72,4 +91,54 @@ contract RaffleTest is Test {
 
         raffle.enterRaffle{value: config.entryFee}();
     }
+
+    /*////////////////////////////////////////////////////////
+                        checkUpkeep  
+    ///////////////////////////////////////////////////////*/
+
+    function testCheckUpkeepReturnsFalseWhenTimeHasntPassed() enterRaffle public {
+        (bool upKeepNeeded,) = raffle.checkUpkeep("");
+
+        assertFalse(upKeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseWhenCalculating() enterRaffle pastForward calculating public {
+        (bool upKeepNeeded,) = raffle.checkUpkeep("");
+
+        assertFalse(upKeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseWhenNoOneEntered() pastForward public {
+        (bool upKeepNeeded,) = raffle.checkUpkeep("");
+
+        assertFalse(upKeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsTrueWhenAllConditionsAreMet() enterRaffle pastForward public {
+        (bool upKeepNeeded,) = raffle.checkUpkeep("");
+
+        assertTrue(upKeepNeeded);
+    }
+
+    /*////////////////////////////////////////////////////////
+                        performUpkeep  
+    ///////////////////////////////////////////////////////*/
+
+    function testRevertWhenNotEnoughTimePassed() public {
+        vm.expectRevert();
+        raffle.performUpkeep("");
+    }
+
+    function testWillPassWhenUpKeepNeededIsTrue() enterRaffle pastForward public {
+        raffle.performUpkeep("");
+    }
+
+    /*////////////////////////////////////////////////////////
+                        fulfillRandomWords  
+    ///////////////////////////////////////////////////////*/
+
+    // function testRaffleStateShouldTurnOpenAfterFulfillRandomWords() calculating public {
+    //     raffle.fulfillRandomWords(12, [12]);
+    //     assertEq(uint256(raffle.getRaffleState()), 0);
+    // }
 }
