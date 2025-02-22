@@ -24,9 +24,17 @@ contract RaffleTest is Test {
         vm.deal(i_participant, STARTING_BALANCE);
     }
 
-    modifier enterRaffle {
+    modifier enterRaffle() {
         vm.prank(i_participant);
         raffle.enterRaffle{value: config.entryFee}();
+
+        _;
+    }
+
+    modifier calculating() {
+        vm.warp(block.timestamp + config.interval);
+        vm.roll(block.number + 1);
+        raffle.performUpkeep("");
 
         _;
     }
@@ -46,15 +54,13 @@ contract RaffleTest is Test {
         raffle.performUpkeep("");
     }
 
-    function testEnterShouldRevertIfStateIsCalculating() public {
+    function testEnterShouldRevertIfStateIsCalculating() public enterRaffle calculating {
         vm.prank(i_participant);
-        raffle.setRaffleState(1);
-        
         vm.expectRevert(Raffle.Raffle__NotOpen.selector);
         raffle.enterRaffle();
     }
 
-    function testParticipenthShouldExistAfterEnteringTheRaffle() enterRaffle public {
+    function testParticipenthShouldExistAfterEnteringTheRaffle() public enterRaffle {
         assertEq(raffle.getParticipent(0), i_participant);
     }
 
