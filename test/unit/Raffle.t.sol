@@ -173,7 +173,6 @@ contract RaffleTest is Test {
         uint256 startTime = raffle.getLastTimestamp();
         uint256 winnerStartingBalance = excpectedWinner.balance;
 
-
         vm.recordLogs();
         raffle.performUpkeep("");
         Vm.Log[] memory logs = vm.getRecordedLogs();
