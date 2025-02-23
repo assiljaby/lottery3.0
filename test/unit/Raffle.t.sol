@@ -7,8 +7,9 @@ import {DeployRaffle} from "script/Raffle.s.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {ScriptConstants} from "script/HelperConfig.s.sol";
 
-contract RaffleTest is Test {
+contract RaffleTest is Test, ScriptConstants {
     Raffle private raffle;
     HelperConfig private helperConfig;
     HelperConfig.NetworkConfig private config;
@@ -47,6 +48,14 @@ contract RaffleTest is Test {
     modifier fastForward() {
         vm.warp(block.timestamp + config.interval);
         vm.roll(block.number + 1);
+
+        _;
+    }
+
+    modifier skipFork() {
+        if (block.chainid != LOCAL_CHAIN_ID) {
+            return;
+        }
 
         _;
     }
@@ -157,12 +166,13 @@ contract RaffleTest is Test {
         public
         enterRaffle
         fastForward
+        skipFork
     {
         vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
         VRFCoordinatorV2_5Mock(config.vrfCoordinator).fulfillRandomWords(randomRequestId, address(raffle));
     }
 
-    function testFulfillRandomWordsPicksAWinnerResetsAndSendsMoney() public fastForward {
+    function testFulfillRandomWordsPicksAWinnerResetsAndSendsMoney() public fastForward skipFork {
         uint256 numParticipants = 4;
         address excpectedWinner = address(1);
         for (uint256 i = 0; i < numParticipants; i++) {
