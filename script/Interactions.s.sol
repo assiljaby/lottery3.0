@@ -74,7 +74,7 @@ contract FundSubscription is Script, ScriptConstants {
 
         if (block.chainid == LOCAL_CHAIN_ID) {
             vm.startBroadcast();
-            VRFCoordinatorV2_5Mock(_vrfCoordinator).fundSubscription(_subId, FUND_AMMOUNT);
+            VRFCoordinatorV2_5Mock(_vrfCoordinator).fundSubscription(_subId, FUND_AMMOUNT * 100);
             vm.stopBroadcast();
         } else {
             vm.startBroadcast();
@@ -100,7 +100,7 @@ contract AddConsumer is Script {
     /**
      * This function adds the consumer to the VRF subscription.
      * @param _latestDeployed - this is the consumer contract that we are adding to the VRF subscription
-     * @param _vrfCoordinator - 
+     * @param _vrfCoordinator -
      * @param _subId - subscription ID
      */
     function addConsumer(address _latestDeployed, address _vrfCoordinator, uint256 _subId) public {
